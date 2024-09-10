@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@custom-react-hooks/use-element-size": "^1.5.1",
     "lodash": "^4.17.21",
     "next": "14.2.9",
     "react": "^18",

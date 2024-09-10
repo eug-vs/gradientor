@@ -1,103 +1,211 @@
+"use client";
+import { useElementSize } from "@custom-react-hooks/use-element-size";
 import _ from "lodash";
-import { CSSProperties } from "react";
+import { CSSProperties, useState } from "react";
 
-type Percentage = `${number}%`;
+type PercentageString = `${number}%`;
 
-type Vector2 = readonly [Percentage, Percentage];
+function toPercentageString(n: number): PercentageString {
+  return `${n * 100}%`;
+}
+
+type Vector2<T> = [T, T];
+type Vector = Vector2<number>;
 
 type Stop = {
   color: CSSProperties["color"];
-  breakpoint: Percentage;
+  breakpoint: number;
 };
 
-interface Props {
-  center: Vector2;
-  a: Vector2;
-  b: Vector2;
-  stops: readonly Stop[];
-}
-
-function extractNumber(p: Percentage = "0%") {
-  return Number(p.replace("%", ""));
-}
-
-function toPercentage(p: number): Percentage {
-  return `${p}%`;
-}
-
-function zipMap(
-  a: Vector2,
-  b: Vector2,
-  operation: (a: number, b: number) => number,
-) {
+// Very clever name isn't it? jk
+function zipMap<T>(a: Vector2<T>, b: Vector2<T>, operation: (a: T, b: T) => T) {
   return _.zip(a, b).map((zipped) => {
-    const [a, b] = zipped.map(extractNumber);
-    return toPercentage(operation(a, b));
-  });
+    const [a, b] = zipped;
+    if (a === undefined || b === undefined) throw new Error("WTF");
+    return operation(a, b);
+  }) as Vector2<T>;
 }
 
-function sub(a: Vector2, b: Vector2) {
-  return zipMap(a, b, (a, b) => a - b);
+function sub<T extends number>(a: Vector2<T>, b: Vector2<T>) {
+  return zipMap(a, b, (a, b) => (a - b) as T);
 }
 
-function RadialBackground({ center, a, b, stops }: Props) {
+// All vectors express a position in normalized space of the parent container's bounding box
+// with the top-left being (0, 0) and bottom-right being (1, 1)
+interface Props {
+  // Center of the ellipse
+  center: Vector;
+  // Middlepoints of the sides of ellipse's bounding box
+  a: Vector;
+  b: Vector;
+
+  stops: Stop[];
+  showHandles?: boolean;
+  showGrid?: boolean;
+  debug?: boolean;
+}
+
+function RadialBackground({
+  center,
+  a,
+  b,
+  stops,
+  debug = false,
+  showHandles = false,
+  showGrid = false,
+}: Props) {
+  // Is this the only way to get aspect ratio?
+  const [ref, parentSize] = useElementSize();
+  const parentAspect = (parentSize.width || 1) / (parentSize.height || 1);
+
+  // We always start with 100% 100% at 50% 50% (ellipse inscribed into bounding box)
+  const originalGradientCenter: Vector = [0.5, 0.5];
+  const originalGradientSize: Vector = [1, 1];
+
+  // For whatever reason we need to remap stops to a range (0%, 50%)
   const normalizedStops = stops.map((stop) => ({
     color: stop.color,
-    breakpoint: toPercentage(extractNumber(stop.breakpoint) / 2),
+    breakpoint: stop.breakpoint / 2,
   }));
 
-  const originalGradientCenter: Vector2 = ["50%", "50%"];
-  const originalGradientSize: Vector2 = ["100%", "100%"];
+  // Apply radial gradient which will then be manually transformed
+  const backgroundImage = `radial-gradient(
+    ${originalGradientSize.map(toPercentageString).join(" ")}
+    at ${originalGradientCenter.map(toPercentageString).join(" ")},
+    ${normalizedStops.map((stop) => `${stop.color} ${toPercentageString(stop.breakpoint)}`).join(", ")}
+  )`;
 
+  // Translate from origianl gradient center (50% 50%) to desired center point
   const translation = sub(center, originalGradientCenter);
+  const translateString = `translate(${translation.map(toPercentageString).join(", ")})`;
 
-  const A = sub(a, center)
-    .map(extractNumber)
-    .map((x) => (x / extractNumber(originalGradientSize[0])) * 2);
-  const B = sub(b, center)
-    .map(extractNumber)
-    .map((x) => (x / extractNumber(originalGradientSize[1])) * 2);
+  // Create transformation matrix
+  // First, express A/B points relatively to center
+  // Then we scale everything by 2 (this is needed to match the size)
+  const A = sub(a, center).map((x) => x * 2);
+  const B = sub(b, center).map((x) => x * 2);
 
-  console.log({ translation, a });
+  console.log({ A, B });
+  // Account for aspect ratio (don't ask me why this works)
+  A[1] = A[1] / parentAspect;
+  B[0] = B[0] * parentAspect;
+  console.log("Transformed", { A, B });
+  const matrixString = `matrix(${A.join(", ")}, ${B.join(", ")}, 0, 0)`;
 
   return (
     <>
       <div
-        className="size-full top-0 left-0 -z-20 absolute overflow-hidden"
+        ref={ref}
+        className="size-full top-0 left-0 -z-20 absolute"
         style={{
-          background: _.last(stops)?.color,
+          background: _.last(stops)?.color, // Fill everything else with the color of the last stop
+          overflow: debug ? "visible" : "hidden",
         }}
       >
         <div
-          className="size-full top-0 left-0 -z-10 absolute"
+          className="size-full top-0 left-0 -z-10 absolute grid grid-cols-2"
           style={{
-            backgroundImage: `radial-gradient(${originalGradientSize.join(" ")} at ${originalGradientCenter.join(" ")}, ${normalizedStops.map((stop) => `${stop.color} ${stop.breakpoint}`).join(", ")})`,
-            transform: `translate(${translation[0]}, ${translation[1]}) matrix(${A.join(", ")}, ${B.join(", ")}, 0, 0)`,
+            backgroundImage,
+            transform: `${translateString} ${matrixString}`,
           }}
-        />
+        >
+          {showGrid &&
+            _.times(4).map((i) => (
+              <div
+                key={i}
+                className="border border-black border-collapse"
+              ></div>
+            ))}
+        </div>
+        {showHandles &&
+          [center, a, b].map((point, index) => (
+            <div
+              key={index}
+              className="size-full top-0 left-0 z-10 absolute"
+              style={{
+                transform: `translate(${point.map(toPercentageString).join(", ")})`,
+              }}
+            >
+              <div className="bg-black rounded-full size-4 translate-x-[-50%] translate-y-[-50%]"></div>
+            </div>
+          ))}
       </div>
     </>
   );
 }
 
 export default function Home() {
+  const [width, setWidth] = useState(500);
+  const [debug, setDebug] = useState(false);
+  const [showHandles, setShowHandles] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+
   const props = {
-    center: ["0%", "0%"],
-    a: ["100%", "0%"],
-    b: ["0%", "100%"],
+    center: [0, 0] as Vector,
+    a: [0.25, -0.2] as Vector,
+    b: [0.25, 1] as Vector,
     stops: [
-      { color: "red", breakpoint: "0%" },
-      { color: "green", breakpoint: "100%" },
+      { color: "cyan", breakpoint: 0 },
+      { color: "magenta", breakpoint: 0.5 },
+      { color: "orange", breakpoint: 1 },
     ],
-  } as const;
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <div className="size-40 border-2 border-slate-900 relative">
-          <span>Hello, world</span>
-          <RadialBackground {...props} />
-        </div>
-      </main>
-    </div>
+    <main className="min-h-screen flex flex-col gap-8 row-start-2 items-center justify-center">
+      <span>My size is {width}px x 200px</span>
+      <input
+        type="range"
+        min={150}
+        max={800}
+        onChange={(e) => setWidth(+e.target.value)}
+        value={width}
+      />
+      <div className="flex gap-1.5">
+        <input
+          id="debug"
+          type="checkbox"
+          value={debug.toString()}
+          onChange={(e) => {
+            setDebug(e.target.checked);
+          }}
+        />
+        <label htmlFor="debug">Debug</label>
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          id="handles"
+          type="checkbox"
+          value={showHandles.toString()}
+          onChange={(e) => setShowHandles(e.target.checked)}
+        />
+        <label htmlFor="handles">Show handles</label>
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          id="grid"
+          type="checkbox"
+          value={showGrid.toString()}
+          onChange={(e) => setShowGrid(e.target.checked)}
+        />
+        <label htmlFor="grid">Show grid</label>
+      </div>
+
+      <div
+        className="relative flex justify-center flex-col items-center"
+        style={{
+          width: width,
+          height: 200,
+        }}
+      >
+        <RadialBackground
+          debug={debug}
+          showHandles={showHandles}
+          showGrid={showGrid}
+          {...props}
+        />
+        Hello, world!
+      </div>
+    </main>
   );
 }
