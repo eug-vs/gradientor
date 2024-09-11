@@ -1,8 +1,7 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
 import { RadialBackground, type Vector } from "./radialBackground";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   Form,
@@ -12,9 +11,10 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import _ from "lodash";
+import Draggable from "react-draggable";
+import { cn } from "@/lib/utils";
 
 const vectorSchema = z.tuple([z.number(), z.number()]);
 
@@ -49,9 +49,9 @@ export default function Home() {
       initialParentAspect: 5 / 2,
 
       debug: false,
-      showHandles: false,
+      showHandles: true,
       showGrid: false,
-      runtimeAspectCalculation: false,
+      runtimeAspectCalculation: true,
 
       originalGradientSize: [0.5, 0.5] as Vector,
 
@@ -66,7 +66,7 @@ export default function Home() {
     },
   });
 
-  const { width, height, ...props } = form.watch();
+  const { width, height, showHandles, ...props } = form.watch();
 
   return (
     <main className="min-h-screen flex gap-8 p-20 bg-gradient-to-r from-green-100 to-blue-200 rounded-lg">
@@ -75,8 +75,8 @@ export default function Home() {
           {(
             [
               "debug",
-              "showHandles",
               "showGrid",
+              "showHandles",
               "runtimeAspectCalculation",
             ] as const
           ).map((name) => (
@@ -88,7 +88,7 @@ export default function Home() {
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                   <FormControl>
                     <Checkbox
-                      value={field.value.toString()}
+                      defaultChecked={field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
@@ -108,7 +108,7 @@ export default function Home() {
                     min={150}
                     max={800}
                     value={[field.value]}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) => field.onChange(v[0])}
                   />
                 </FormControl>
                 <FormLabel>Width</FormLabel>
@@ -126,7 +126,7 @@ export default function Home() {
                     min={150}
                     max={800}
                     value={[field.value]}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) => field.onChange(v[0])}
                   />
                 </FormControl>
                 <FormLabel>Height</FormLabel>
@@ -145,7 +145,7 @@ export default function Home() {
                     max={1.5}
                     step={0.01}
                     value={[field.value]}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) => field.onChange(v[0])}
                   />
                 </FormControl>
                 <FormLabel>Original ellipse width %</FormLabel>
@@ -164,10 +164,29 @@ export default function Home() {
                     max={1.5}
                     step={0.01}
                     value={[field.value]}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) => field.onChange(v[0])}
                   />
                 </FormControl>
                 <FormLabel>Original ellipse width %</FormLabel>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="initialParentAspect"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Slider
+                    className="max-w-52"
+                    min={0.2}
+                    max={5}
+                    step={0.01}
+                    value={[field.value]}
+                    onValueChange={(v) => field.onChange(v[0])}
+                  />
+                </FormControl>
+                <FormLabel>Initial parent aspect ratio</FormLabel>
               </FormItem>
             )}
           />
@@ -175,8 +194,8 @@ export default function Home() {
         <div
           className="mt-20 mx-auto relative flex justify-center flex-col items-center col-span-2 rounded-lg border border-gray-500"
           style={{
-            width: `${width}px`,
-            height: `${height}px`,
+            width,
+            height,
           }}
         >
           <RadialBackground className="rounded-lg" {...props} />
@@ -184,6 +203,40 @@ export default function Home() {
           <span className="z-10">
             {width} x {height}
           </span>
+          {showHandles &&
+            (["center", "a", "b"] as const).map((name, index) => (
+              <div className="absolute" key={index}>
+                <Controller
+                  name={name}
+                  control={form.control}
+                  render={({ field }) => (
+                    <Draggable
+                      positionOffset={{
+                        x: -width / 2,
+                        y: -height / 2,
+                      }}
+                      position={{
+                        x: field.value[0] * width,
+                        y: field.value[1] * height,
+                      }}
+                      onDrag={(_e, data) => {
+                        field.onChange([data.x / width, data.y / height]);
+                      }}
+                    >
+                      <div className="cursor-move z-50">
+                        <div
+                          className={cn(`rounded-full size-4`, {
+                            "bg-black": index === 0,
+                            "bg-red-500": index === 1,
+                            "bg-blue-500": index === 2,
+                          })}
+                        />
+                      </div>
+                    </Draggable>
+                  )}
+                ></Controller>
+              </div>
+            ))}
         </div>
       </div>
       <div>

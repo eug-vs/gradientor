@@ -46,7 +46,6 @@ type Props = {
   runtimeAspectCalculation?: boolean;
 
   stops: Stop[];
-  showHandles?: boolean;
   showGrid?: boolean;
   debug?: boolean;
 } & (
@@ -65,7 +64,6 @@ export function RadialBackground({
   b,
   stops,
   debug = false,
-  showHandles = false,
   showGrid = false,
   originalGradientSize = [1, 1] as Vector,
   initialParentAspect = 1,
@@ -109,11 +107,9 @@ export function RadialBackground({
   const A = sub(a, center).map((x) => (x * 2) / originalGradientSize[0]);
   const B = sub(b, center).map((x) => (x * 2) / originalGradientSize[1]);
 
-  console.log({ A, B });
   // Account for aspect ratio (don't ask me why this works)
   A[1] = A[1] / parentAspect;
   B[0] = B[0] * parentAspect;
-  console.log("Transformed", { A, B });
   const matrixString = `matrix(${A.join(", ")}, ${B.join(", ")}, 0, 0)`;
 
   return (
@@ -141,22 +137,10 @@ export function RadialBackground({
           _.times(4).map((i) => (
             <div
               key={i}
-              className="border border-black border-collapse animate-in zoom-in"
+              className="border border-black/30 animate-in zoom-in"
             ></div>
           ))}
       </div>
-      {showHandles &&
-        [center, a, b].map((point, index) => (
-          <div
-            key={index}
-            className="size-full top-0 left-0 z-50 absolute animate-in zoom-in"
-            style={{
-              transform: `translate(${point.map(toPercentageString).join(", ")})`,
-            }}
-          >
-            <div className="bg-black rounded-full size-4 translate-x-[-50%] translate-y-[-50%]"></div>
-          </div>
-        ))}
     </div>
   );
 }
