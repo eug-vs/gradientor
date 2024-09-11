@@ -1,7 +1,7 @@
 "use client";
 import { useElementSize } from "@custom-react-hooks/use-element-size";
 import _ from "lodash";
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useMemo, useState } from "react";
 
 type PercentageString = `${number}%`;
 
@@ -134,78 +134,103 @@ function RadialBackground({
   );
 }
 
+const defaultProps = {
+  center: [0, 0] as Vector,
+  a: [0.25, -0.2] as Vector,
+  b: [0.25, 1] as Vector,
+  stops: [
+    { color: "cyan", breakpoint: 0 },
+    { color: "magenta", breakpoint: 0.5 },
+    { color: "orange", breakpoint: 1 },
+  ],
+};
+
 export default function Home() {
   const [width, setWidth] = useState(500);
   const [debug, setDebug] = useState(false);
   const [showHandles, setShowHandles] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const [configText, setConfigText] = useState(
+    JSON.stringify(defaultProps, null, 2),
+  );
 
-  const props = {
-    center: [0, 0] as Vector,
-    a: [0.25, -0.2] as Vector,
-    b: [0.25, 1] as Vector,
-    stops: [
-      { color: "cyan", breakpoint: 0 },
-      { color: "magenta", breakpoint: 0.5 },
-      { color: "orange", breakpoint: 1 },
-    ],
-  };
+  const props = useMemo(() => {
+    try {
+      return JSON.parse(configText);
+    } catch (e) {
+      return null;
+    }
+  }, [configText]);
 
   return (
-    <main className="min-h-screen flex flex-col gap-8 row-start-2 items-center justify-center">
-      <span>My size is {width}px x 200px</span>
-      <input
-        type="range"
-        min={150}
-        max={800}
-        onChange={(e) => setWidth(+e.target.value)}
-        value={width}
+    <main className="min-h-screen flex gap-8 p-20">
+      <div className="flex flex-col grow gap-20">
+        <section>
+          <div className="grid gap-1.5 w-min">
+            <label htmlFor="size">Size ({width}px x 200px)</label>
+            <input
+              id="size"
+              type="range"
+              min={150}
+              max={800}
+              onChange={(e) => setWidth(+e.target.value)}
+              value={width}
+            />
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              id="debug"
+              type="checkbox"
+              value={debug.toString()}
+              onChange={(e) => {
+                setDebug(e.target.checked);
+              }}
+            />
+            <label htmlFor="debug">Debug</label>
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              id="handles"
+              type="checkbox"
+              value={showHandles.toString()}
+              onChange={(e) => setShowHandles(e.target.checked)}
+            />
+            <label htmlFor="handles">Show handles</label>
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              id="grid"
+              type="checkbox"
+              value={showGrid.toString()}
+              onChange={(e) => setShowGrid(e.target.checked)}
+            />
+            <label htmlFor="grid">Show grid</label>
+          </div>
+        </section>
+        {props && (
+          <div
+            className="mx-auto relative flex justify-center flex-col items-center col-span-2"
+            style={{
+              width: width,
+              height: 200,
+            }}
+          >
+            <RadialBackground
+              debug={debug}
+              showHandles={showHandles}
+              showGrid={showGrid}
+              {...props}
+            />
+            Hello, world!
+          </div>
+        )}
+      </div>
+      <textarea
+        className="font-mono"
+        cols={30}
+        value={configText}
+        onChange={(e) => setConfigText(e.target.value)}
       />
-      <div className="flex gap-1.5">
-        <input
-          id="debug"
-          type="checkbox"
-          value={debug.toString()}
-          onChange={(e) => {
-            setDebug(e.target.checked);
-          }}
-        />
-        <label htmlFor="debug">Debug</label>
-      </div>
-      <div className="flex gap-1.5">
-        <input
-          id="handles"
-          type="checkbox"
-          value={showHandles.toString()}
-          onChange={(e) => setShowHandles(e.target.checked)}
-        />
-        <label htmlFor="handles">Show handles</label>
-      </div>
-      <div className="flex gap-1.5">
-        <input
-          id="grid"
-          type="checkbox"
-          value={showGrid.toString()}
-          onChange={(e) => setShowGrid(e.target.checked)}
-        />
-        <label htmlFor="grid">Show grid</label>
-      </div>
-
-      <div
-        className="relative flex justify-center flex-col items-center"
-        style={{
-          width: width,
-          height: 200,
-        }}
-      >
-        <RadialBackground
-          debug={debug}
-          showHandles={showHandles}
-          showGrid={showGrid}
-          {...props}
-        />
-        Hello, world!
-      </div>
     </main>
   );
 }
