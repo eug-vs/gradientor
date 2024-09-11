@@ -139,7 +139,10 @@ export function RadialBackground({
       >
         {showGrid &&
           _.times(4).map((i) => (
-            <div key={i} className="border border-black border-collapse"></div>
+            <div
+              key={i}
+              className="border border-black border-collapse animate-in zoom-in"
+            ></div>
           ))}
       </div>
       {showHandles &&
