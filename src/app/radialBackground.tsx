@@ -93,11 +93,11 @@ export function RadialBackground({
 
   const style = useMemo(() => {
     // Apply radial gradient which will then be manually transformed
-    const backgroundImage = `radial-gradient(
-      ${originalGradientSize.map(toPercentageString).join(" ")}
-      at ${originalGradientCenter.map(toPercentageString).join(" ")},
-      ${normalizedStops.map((stop) => `${stop.color} ${toPercentageString(stop.breakpoint)}`).join(", ")}
-    )`;
+    const backgroundImage = `radial-gradient(\
+${originalGradientSize.map(toPercentageString).join(" ")}\
+ at ${originalGradientCenter.map(toPercentageString).join(" ")},\
+ ${normalizedStops.map((stop) => `${stop.color} ${toPercentageString(stop.breakpoint)}`).join(", ")}\
+)`;
 
     // Translate from origianl gradient center (50% 50%) to desired center point
     const translation = sub(center, originalGradientCenter);
@@ -142,17 +142,18 @@ export function RadialBackground({
         overflow: debug ? "visible" : "hidden",
       }}
     >
-      <div
-        className="size-full top-0 left-0 absolute grid grid-cols-2"
-        style={style}
-      >
-        {showGrid &&
-          _.times(4).map((i) => (
-            <div
-              key={i}
-              className="border border-black/30 animate-in zoom-in"
-            ></div>
-          ))}
+      <div className="size-full top-0 left-0 absolute" style={style}>
+        {showGrid && (
+          <div
+            className="size-full pointer-events-none animate-in zoom-in"
+            style={{
+              background: `
+repeating-linear-gradient(0deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 50px),
+repeating-linear-gradient(90deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 50px)
+`,
+            }}
+          />
+        )}
       </div>
     </div>
   );
