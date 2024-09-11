@@ -39,6 +39,9 @@ interface Props {
   a: Vector;
   b: Vector;
 
+  // The smaller starting ellipse relative to bounding box, the more background around it we have to work with
+  originalGradientSize: Vector;
+
   stops: Stop[];
   showHandles?: boolean;
   showGrid?: boolean;
@@ -53,14 +56,16 @@ function RadialBackground({
   debug = false,
   showHandles = false,
   showGrid = false,
+  originalGradientSize = [1, 1] as Vector,
 }: Props) {
   // Is this the only way to get aspect ratio?
   const [ref, parentSize] = useElementSize();
+  const isParentSizeAvailable =
+    parentSize.width !== 0 && parentSize.height !== 0;
   const parentAspect = (parentSize.width || 1) / (parentSize.height || 1);
 
-  // We always start with 100% 100% at 50% 50% (ellipse inscribed into bounding box)
+  // We usually start with 100% 100% at 50% 50% (ellipse inscribed into bounding box)
   const originalGradientCenter: Vector = [0.5, 0.5];
-  const originalGradientSize: Vector = [1, 1];
 
   // For whatever reason we need to remap stops to a range (0%, 50%)
   const normalizedStops = stops.map((stop) => ({
@@ -81,9 +86,9 @@ function RadialBackground({
 
   // Create transformation matrix
   // First, express A/B points relatively to center
-  // Then we scale everything by 2 (this is needed to match the size)
-  const A = sub(a, center).map((x) => x * 2);
-  const B = sub(b, center).map((x) => x * 2);
+  // Then we scale everything with respect to original gradient size
+  const A = sub(a, center).map((x) => (x * 2) / originalGradientSize[0]);
+  const B = sub(b, center).map((x) => (x * 2) / originalGradientSize[1]);
 
   console.log({ A, B });
   // Account for aspect ratio (don't ask me why this works)
@@ -93,55 +98,57 @@ function RadialBackground({
   const matrixString = `matrix(${A.join(", ")}, ${B.join(", ")}, 0, 0)`;
 
   return (
-    <>
-      <div
-        ref={ref}
-        className="size-full top-0 left-0 -z-20 absolute"
-        style={{
-          background: _.last(stops)?.color, // Fill everything else with the color of the last stop
-          overflow: debug ? "visible" : "hidden",
-        }}
-      >
-        <div
-          className="size-full top-0 left-0 -z-10 absolute grid grid-cols-2"
-          style={{
-            backgroundImage,
-            transform: `${translateString} ${matrixString}`,
-          }}
-        >
-          {showGrid &&
-            _.times(4).map((i) => (
+    <div
+      ref={ref}
+      className="size-full top-0 left-0 -z-20 absolute"
+      style={{
+        overflow: debug ? "visible" : "hidden",
+      }}
+    >
+      {isParentSizeAvailable && (
+        <>
+          <div
+            className="size-full top-0 left-0 -z-10 absolute grid grid-cols-2 transition"
+            style={{
+              backgroundImage,
+              transform: `${translateString} ${matrixString}`,
+            }}
+          >
+            {showGrid &&
+              _.times(4).map((i) => (
+                <div
+                  key={i}
+                  className="border border-black border-collapse"
+                ></div>
+              ))}
+          </div>
+          {showHandles &&
+            [center, a, b].map((point, index) => (
               <div
-                key={i}
-                className="border border-black border-collapse"
-              ></div>
+                key={index}
+                className="size-full top-0 left-0 z-10 absolute"
+                style={{
+                  transform: `translate(${point.map(toPercentageString).join(", ")})`,
+                }}
+              >
+                <div className="bg-black rounded-full size-4 translate-x-[-50%] translate-y-[-50%]"></div>
+              </div>
             ))}
-        </div>
-        {showHandles &&
-          [center, a, b].map((point, index) => (
-            <div
-              key={index}
-              className="size-full top-0 left-0 z-10 absolute"
-              style={{
-                transform: `translate(${point.map(toPercentageString).join(", ")})`,
-              }}
-            >
-              <div className="bg-black rounded-full size-4 translate-x-[-50%] translate-y-[-50%]"></div>
-            </div>
-          ))}
-      </div>
-    </>
+        </>
+      )}
+    </div>
   );
 }
 
 const defaultProps = {
-  center: [0, 0] as Vector,
-  a: [0.25, -0.2] as Vector,
-  b: [0.25, 1] as Vector,
+  center: [0, 1] as Vector,
+  a: [0.75, -0.2] as Vector,
+  b: [0.45, 1.5] as Vector,
+  originalGradientSize: [0.95, 0.75] as Vector,
   stops: [
-    { color: "cyan", breakpoint: 0 },
-    { color: "magenta", breakpoint: 0.5 },
-    { color: "orange", breakpoint: 1 },
+    { color: "hsla(30, 100%, 50%, 75%)", breakpoint: 0 },
+    { color: "hsla(40, 90%, 55%, 75%)", breakpoint: 0.5 },
+    { color: "hsla(55, 80%, 65%, 75%)", breakpoint: 1 },
   ],
 };
 
